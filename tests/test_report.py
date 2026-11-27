@@ -58,8 +58,8 @@ class NewSpeaker(unittest.TestCase):
         self.assertEqual(r.entry("wiim-airplay-2")["match"]["platform"], "AirPlay2")
 
     def test_no_protocol_means_nothing_to_match_it_on(self):
-        r = Run(form(speaker="Echo Show 5", protocol="No local protocol", status="Unsupported", happens="Not found"))
-        self.assertEqual(r.entry("echo-show-5-no-local-protocol")["match"], {"mentions": ["echo show 5"]})
+        r = Run(form(speaker="Amazon Echo Show 5", protocol="No local protocol", status="Unsupported", happens="Not found"))
+        self.assertEqual(r.entry("amazon-echo-show-5-no-local-protocol")["match"], {"mentions": ["amazon echo show 5"]})
 
     def test_a_working_speaker_needs_no_symptoms(self):
         r = Run(form(speaker="Fresh Speaker", status="Supported", happens=""))
@@ -68,6 +68,74 @@ class NewSpeaker(unittest.TestCase):
 
     def test_the_comment_says_what_happened(self):
         self.assertIn("added it as **Supported with quirks**", Run(read("issue-new.md")).said())
+
+
+class SameSpeakerAsTheList(unittest.TestCase):
+    """What the app really sends, against entries that use broad words, as the curated ones do."""
+
+    def app_report(self, line, protocol="DLNA", status="Supported", speaker=None, happens=""):
+        return form(speaker=speaker or "x", protocol=protocol, status=status, happens=happens,
+                    details="App: AriaCast 2.0.0\nSpeaker: " + line + "\nCast: CASTING")
+
+    def test_a_model_containing_the_entrys_word_counts_into_the_entry(self):
+        r = Run(self.app_report("protocol=DLNA, manufacturer=Linkplay, model=WiiM Pro Plus, name=Den", speaker="Linkplay WiiM Pro Plus"), base="curated.json")
+        self.assertEqual(r.result(), "counted")
+        self.assertEqual(len(r.doc()["speakers"]), len(lib.load(os.path.join(DATA, "curated.json"))["speakers"]))
+        self.assertEqual(r.entry("wiim-dlna-restart")["reports"], {"supported": 1})
+
+    def test_the_makers_name_is_enough(self):
+        r = Run(self.app_report("protocol=DLNA, manufacturer=Linkplay Technology Inc., model=Pro Plus, name=Den", speaker="Linkplay Pro Plus"), base="curated.json")
+        self.assertEqual(r.result(), "counted")
+
+    def test_the_most_specific_entry_gets_the_report(self):
+        r = Run(self.app_report("protocol=DLNA, manufacturer=Linkplay, model=WiiM Pro Plus, name=Den", speaker="x"), base="curated-two.json")
+        self.assertEqual(r.entry("wiim-pro")["reports"], {"supported": 1})
+        self.assertEqual(r.entry("wiim-dlna-restart")["reports"], {})
+
+    def test_a_name_given_at_home_is_not_an_identity(self):
+        r = Run(self.app_report("protocol=AirPlay2, name=Studio", protocol="AirPlay 2", speaker="Studio"), base="curated.json")
+        self.assertEqual(r.result(), "refused")
+        self.assertIn("brand and model", r.said())
+        self.assertTrue(r.untouched())
+
+    def test_the_same_name_is_fine_once_the_reporter_writes_the_model(self):
+        r = Run(self.app_report("protocol=AirPlay2, name=Studio", protocol="AirPlay 2", speaker="Acme Hi-Fi One"), base="curated.json")
+        self.assertEqual(r.result(), "added")
+        self.assertEqual(r.entry("acme-hi-fi-one-airplay-2")["match"]["mentions"], ["acme hi-fi one"])
+
+    def test_two_owners_of_the_same_unlisted_model_end_up_on_one_entry(self):
+        line = "protocol=DLNA, manufacturer=Acme, model=Play 3 Pro, name=%s"
+        first = Run(self.app_report(line % "Den", speaker="Acme Play 3 Pro"), base="curated.json")
+        self.assertEqual(first.result(), "added")
+        self.assertEqual(first.entry("acme-play-3-pro-dlna")["match"]["mentions"], ["play 3 pro"])
+        # Another owner, with a name of their own, on a list that now has the first report in it.
+        second = Run(self.app_report(line % "Kitchen", speaker="Acme Play 3 Pro"), base="curated-acme.json")
+        self.assertEqual(second.result(), "counted")
+        self.assertEqual(second.entry("acme-play-3-pro-dlna")["reports"], {"supported": 2})
+        self.assertEqual(len(second.doc()["speakers"]), len(lib.load(os.path.join(DATA, "curated-acme.json"))["speakers"]))
+
+    def test_an_echo_from_a_scan_counts_into_the_curated_echo_entry(self):
+        r = Run(form(speaker="Amazon Echo Show 5", protocol="No local protocol", status="Unsupported", happens="not found",
+                     details="Speaker: name=Echo Show 5-3f2"), base="curated.json")
+        self.assertEqual(r.result(), "counted")  # it agrees with the entry, so no review
+        self.assertEqual(r.entry("echo-show5-hub-no-airplay")["reports"], {"unsupported": 1})
+
+    def test_a_report_that_disagrees_with_a_checked_entry_asks_for_review(self):
+        r = Run(self.app_report("protocol=DLNA, manufacturer=Linkplay, model=WiiM Pro Plus, name=Den", status="Unsupported", speaker="x", happens="Never plays"), base="curated.json")
+        self.assertEqual(r.result(), "counted-review")
+        self.assertEqual(r.entry("wiim-dlna-restart")["status"], "supported")
+        self.assertEqual(r.entry("wiim-dlna-restart")["reports"], {"unsupported": 1})
+        self.assertIn("left this issue open", r.said())
+
+    def test_a_report_that_agrees_with_a_checked_entry_just_counts(self):
+        r = Run(self.app_report("protocol=DLNA, manufacturer=Linkplay, model=WiiM Pro Plus, name=Den", speaker="x"), base="curated.json")
+        self.assertEqual(r.result(), "counted")
+
+    def test_software_receivers_are_not_speakers(self):
+        for protocol in ("AriaCast", "VBAN", "Snapcast", "Sendspin"):
+            r = Run(form(speaker="Anything Box", protocol=protocol, status="Supported", happens=""))
+            self.assertEqual(r.result(), "refused", protocol)
+            self.assertIn("Protocol", r.said())
 
 
 class KnownSpeaker(unittest.TestCase):

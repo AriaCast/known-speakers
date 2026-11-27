@@ -16,15 +16,13 @@ STATUSES = ("supported", "quirks", "unsupported")
 STATUS_LABELS = {"supported": "Supported", "quirks": "Supported with quirks", "unsupported": "Unsupported"}
 
 # Protocol name in the report form -> the platform name the apps use (None: no protocol to match).
+# Only things that are speakers: AriaCast receivers, Snapcast, VBAN and Sendspin are software on a
+# phone, a computer or a server, so there is no speaker to judge and they are not offered.
 PLATFORMS = {
     "AirPlay 2": "AirPlay2",
     "AirPlay 1": "AirPlay",
     "DLNA": "DLNA",
     "Google Cast": "Google Cast",
-    "Snapcast": "Snapcast",
-    "Sendspin": "Sendspin",
-    "AriaCast": "AriaCast",
-    "VBAN": "VBAN",
     "No local protocol": None,
     "Other": None,
 }
@@ -104,12 +102,47 @@ def validate(doc):
     return problems
 
 
-def find(doc, platform, mention):
-    """The entry for the same speaker over the same protocol, if the list has one."""
+def haystack(device):
+    """What an entry's words are looked for in: the name, model and maker of a device, lowercased.
+
+    A device is a dict with optional "platform", "name", "model" and "manufacturer". This is the
+    same rule the apps apply (tests/data/matching-cases.json holds the cases both must agree on).
+    """
+    return " ".join(device[k] for k in ("name", "model", "manufacturer") if device.get(k)).lower()
+
+
+def specificity(entry, device):
+    """How well an entry fits a device, or 0 if it does not fit.
+
+    An entry that names a protocol only fits devices that speak it; one that does not fits any.
+    A word found in the device's name or model scores its length, so "wiim pro" beats "wiim". A
+    word found only in the maker's name scores 1: knowing the maker is better than nothing, but a
+    model word is always more specific than a maker's.
+    """
+    platform = entry["match"].get("platform")
+    if platform and platform != device.get("platform"):
+        return 0
+    words = entry["match"].get("mentions", [])
+    own = " ".join(device[k] for k in ("name", "model") if device.get(k)).lower()
+    best = max((len(w) for w in words if w in own), default=0)
+    if best:
+        return best
+    return 1 if any(w in (device.get("manufacturer") or "").lower() for w in words) else 0
+
+
+def matching(doc, device):
+    """Every entry that fits the device, in list order."""
+    return [e for e in doc["speakers"] if specificity(e, device) > 0]
+
+
+def best_match(doc, device):
+    """The entry that fits the device best (the longest word wins, the first on a tie), if any."""
+    best, best_score = None, 0
     for e in doc["speakers"]:
-        if mention in e["match"].get("mentions", []) and e["match"].get("platform") == platform:
-            return e
-    return None
+        score = specificity(e, device)
+        if score > best_score:
+            best, best_score = e, score
+    return best
 
 
 def dump(doc):

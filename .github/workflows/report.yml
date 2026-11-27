@@ -57,15 +57,20 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: Answer and close the issue
+      - name: Answer, and close the issue unless a maintainer should look
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           RESULT: ${{ steps.record.outputs.result }}
         run: |
           gh issue comment "$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
-          if [ "$RESULT" = "refused" ]; then
-            gh issue close "$ISSUE_NUMBER" --reason "not planned"
-          else
-            gh issue close "$ISSUE_NUMBER" --reason completed
-          fi
+          case "$RESULT" in
+            refused)
+              gh issue close "$ISSUE_NUMBER" --reason "not planned" ;;
+            counted-review)
+              # The report disagrees with an entry a maintainer checked: keep it open, and say so.
+              gh label create needs-review --description "A report disagrees with a curated entry" --force
+              gh issue edit "$ISSUE_NUMBER" --add-label needs-review ;;
+            *)
+              gh issue close "$ISSUE_NUMBER" --reason completed ;;
+          esac

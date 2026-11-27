@@ -46,17 +46,38 @@ Only these, within these limits (anything else is dropped by the app):
 | `defaultDelayMs` | 0 to 2000 | Starting delay until the user sets their own |
 | `sendMetadata` | `true`/`false` | Send titles and artwork to this speaker |
 
+## Which entry a device belongs to
+
+The apps and the bot use the same rule (`tests/data/matching-cases.json` holds the cases, and the app's
+tests run the same file):
+
+- An entry **fits** a device when its `match.platform` is absent or equal to the device's protocol, and
+  one of its `mentions` is found (as lowercase text) in the device's name, model or maker.
+- When several entries fit, the one with the **longest word found in the name or model** is the best
+  (`wiim pro` beats `wiim`); a word found only in the maker's name counts 1, so a model word always beats
+  a maker's. On a tie, the first in the list wins.
+
 ## What the bot does
 
-A report is a form (`.github/ISSUE_TEMPLATE/speaker-report.yml`). If the speaker (same protocol and
-a word in `mentions`) is already listed, the report is added to `reports` and the shown `status`
-becomes the most reported one (a tie keeps the current one; `locked` entries never change). If not,
-a new entry is added with the status and symptoms the reporter wrote. The log in the issue is never
-stored, a person can send three reports a day, and `config` is never written from a report.
+A report is a form (`.github/ISSUE_TEMPLATE/speaker-report.yml`). The device is taken from the app's
+"Speaker:" line (maker, model), or from what the reporter typed in *Speaker* when the device does not
+say its model. **The name its owner gave a device is never its identity**: a report whose *Speaker* only
+repeats that name is refused and asked for a brand and model.
+
+- If the device fits an entry, the report is added to its `reports`, and the shown `status` becomes the
+  most reported one (a tie keeps the current one). A `locked` entry never changes; if a report disagrees
+  with a locked entry, the issue is left open with the `needs-review` label for a maintainer.
+- If it fits nothing, a new entry is added with the status and symptoms the reporter wrote, recognised by
+  the model.
+
+The log in the issue is never stored, a person can send three reports a day, and `config` is never
+written from a report. Only things that are speakers are offered in the form: AriaCast receivers,
+Snapcast, VBAN and Sendspin are software on a phone, a computer or a server.
 
 ## Keeping the app and this repository in step
 
-`tests/data/generated-sample.json` is what the bot writes for `tests/data/issue-new.md`. The same
-file lives in the app's tests, which check that the app accepts it without skipping anything. If the
+`tests/data/generated-sample.json` is what the bot writes for `tests/data/issue-new.md`, and
+`tests/data/matching-cases.json` holds the matching cases. Both live in the app's tests too, which check
+that the app accepts the first without skipping anything and gives the same answers on the second. If the
 rules change, change `speakers_lib.py`, regenerate that file (`UPDATE_GOLDEN=1`, see the tests) and
 copy it to the app.

@@ -69,11 +69,13 @@ class Helpers(unittest.TestCase):
         self.assertEqual(lib.clean("x" * 50, 10), "x" * 10)
         self.assertEqual(lib.clean(None, 10), "")
 
-    def test_find(self):
+    def test_best_match(self):
         doc = good()
-        self.assertEqual(lib.find(doc, "DLNA", "wiim")["id"], "wiim-dlna-restart")
-        self.assertIsNone(lib.find(doc, "AirPlay2", "wiim"))
-        self.assertIsNone(lib.find(doc, "DLNA", "nothing"))
+        wiim = {"platform": "DLNA", "model": "WiiM Pro Plus"}
+        self.assertEqual(lib.best_match(doc, wiim)["id"], "wiim-dlna-restart")
+        self.assertIsNone(lib.best_match(doc, {"platform": "AirPlay2", "model": "WiiM Pro Plus"}))
+        self.assertIsNone(lib.best_match(doc, {"platform": "DLNA", "model": "nothing"}))
+        self.assertIsNone(lib.best_match(doc, {"platform": "DLNA"}))
 
 
 if __name__ == "__main__":

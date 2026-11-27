@@ -3,7 +3,8 @@
 
 Run by .github/workflows/report.yml. The rule is short:
 
-  * the speaker is already in the list  ->  count the report under its status;
+  * the speaker is already in the list  ->  count the report under its status (and if the entry is
+    one a maintainer locked and the report disagrees with it, leave the issue open for review);
   * it is not                           ->  add it, with the status the reporter chose.
 
 Nothing else is decided here. An entry's shown status follows the most reported one (a tie keeps
@@ -52,11 +53,28 @@ def slug(text):
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60]
 
 
-def mention_for(fields, speaker):
-    """The phrase a speaker is recognised by: the model the app reported, else what was typed."""
-    found = re.search(r"model=(.*?)(?:, (?:name|manufacturer|protocol)=|$)", fields.get("Speaker details", ""), re.M)
-    phrase = lib.clean(found.group(1) if found else speaker, 40).lower()
-    return phrase if lib.mention_ok(phrase) else None
+def reported(fields, key):
+    """One value from the app's "Speaker:" line (`protocol=..., manufacturer=..., model=..., name=...`)."""
+    found = re.search(key + r"=(.*?)(?:, (?:name|model|manufacturer|protocol)=|$)", fields.get("Speaker details", ""), re.M)
+    return lib.clean(found.group(1), 80) if found else None
+
+
+def device_of(fields, speaker, platform):
+    """The device a report is about, or (None, why not).
+
+    The model is what identifies a speaker, never the name its owner gave it: "Studio" or
+    "Echo Show 5-3f2" would match nothing anybody else owns. The app reports the model when the
+    speaker says it; when it does not, the reporter types brand and model in *Speaker*, and that
+    is used instead. If what they typed is just the name they gave the device, ask for the model.
+    """
+    name = reported(fields, "name")
+    model = reported(fields, "model")
+    manufacturer = reported(fields, "manufacturer")
+    if not model:
+        if name and speaker.lower() == name.lower():
+            return None, "The *Speaker* field only repeats the name you gave the device. Please write its brand and model (for example \"Amazon Echo Show 5\")."
+        model = speaker
+    return {"platform": platform, "name": name, "model": model, "manufacturer": manufacturer}, None
 
 
 def shown_status(entry):
@@ -68,7 +86,7 @@ def shown_status(entry):
 
 
 def record(fields, number, repo, doc, reports_today=0):
-    """Returns (outcome, entry, text): outcome is "added", "counted" or "refused"."""
+    """Returns (outcome, entry, text): outcome is "added", "counted", "counted-review" or "refused"."""
     refuse = lambda why: ("refused", None, why)  # noqa: E731
     if reports_today > MAX_PER_AUTHOR_PER_DAY:
         return refuse("You have sent %d reports in the last day; the limit is %d. Please try again tomorrow." % (reports_today, MAX_PER_AUTHOR_PER_DAY))
@@ -81,15 +99,19 @@ def record(fields, number, repo, doc, reports_today=0):
         return refuse("The *Protocol* is not one of the options in the form.")
     if status is None:
         return refuse("*How does it work?* is not one of the options in the form.")
-    mention = mention_for(fields, speaker)
-    if mention is None:
-        return refuse("The speaker's name is too short to recognise it by.")
     platform = lib.PLATFORMS[protocol]
+    device, why = device_of(fields, speaker, platform)
+    if device is None:
+        return refuse(why)
+    mention = lib.clean(device["model"], 40).lower()
+    if not lib.mention_ok(mention):
+        return refuse("The speaker's name is too short to recognise it by.")
 
-    existing = lib.find(doc, platform, mention)
+    existing = lib.best_match(doc, device)
     if existing is not None:
         reports = existing.setdefault("reports", {})
         reports[status] = min(reports.get(status, 0) + 1, lib.MAX_REPORTS)
+        disagrees = bool(existing.get("locked")) and status != existing["status"]
         symptoms = symptoms_of(fields)
         if not existing.get("locked"):
             shown = shown_status(existing)
@@ -101,7 +123,8 @@ def record(fields, number, repo, doc, reports_today=0):
                 else:
                     shown = existing["status"]
             existing["status"] = shown
-        return "counted", existing, ""
+        # A report against what a maintainer checked is the one thing a maintainer should see.
+        return ("counted-review" if disagrees else "counted"), existing, ""
 
     symptoms = symptoms_of(fields)
     if status != "supported" and not symptoms:
@@ -139,6 +162,8 @@ def comment_for(outcome, entry, why):
         return "Thanks. **%s** (%s) was not in the list, so I added it as **%s**. Apps pick it up within a day." % (entry["speaker"], entry["protocol"], label)
     counts = ", ".join("%d %s" % (entry["reports"].get(s, 0), lib.STATUS_LABELS[s].lower()) for s in lib.STATUSES if entry["reports"].get(s, 0))
     note = " This entry is curated by a maintainer, so reports are counted but do not change it." if entry.get("locked") else ""
+    if outcome == "counted-review":
+        note += " Your report differs from what it says, so I left this issue open for a maintainer to look at."
     return "Thanks. **%s** (%s) is already listed as `%s`, so I counted your report. Reports so far: %s. Listed as **%s**.%s" % (
         entry["speaker"], entry["protocol"], entry["id"], counts, label, note)
 
