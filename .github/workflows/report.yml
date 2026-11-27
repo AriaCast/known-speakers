@@ -6,6 +6,9 @@ on:
       - opened
       - reopened
       - labeled
+  issue_comment:
+    types:
+      - created
 
 permissions:
   contents: write
@@ -22,7 +25,10 @@ jobs:
     # when the speaker-report label is added, so unrelated label changes do nothing.
     if: >-
       startsWith(github.event.issue.title, 'Speaker:')
-      && (github.event.action != 'labeled' || github.event.label.name == 'speaker-report')
+      && (
+        (github.event_name == 'issues' && (github.event.action != 'labeled' || github.event.label.name == 'speaker-report'))
+        || (github.event_name == 'issue_comment' && github.event.comment.body == '/process')
+      )
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
