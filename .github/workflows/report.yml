@@ -103,7 +103,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           RESULT: ${{ steps.record.outputs.result }}
         run: |
-          printf '\\n\\n<!-- ariacast-report-processed -->\\n' >> "$RUNNER_TEMP/comment.md"
+          printf '\n\n<!-- ariacast-report-processed -->\n' >> "$RUNNER_TEMP/comment.md"
           gh issue comment "$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
 
           if [ "$RESULT" = "refused" ]; then
