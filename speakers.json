@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": 1,
+  "version": 2,
   "updated": "2026-11-27",
   "speakers": [
     {
@@ -141,6 +141,22 @@
       "evidence": "Maintainer's own devices; Alexa has no local streaming protocol",
       "locked": true,
       "reports": {}
+    },
+    {
+      "id": "imac-imac20-1-airplay-2",
+      "speaker": "iMac (iMac20,1)",
+      "protocol": "AirPlay 2",
+      "status": "supported",
+      "match": {
+        "platform": "AirPlay2",
+        "mentions": [
+          "imac20,1"
+        ]
+      },
+      "evidence": "[#2](https://github.com/AriaCast/known-speakers/issues/2), reported by a user",
+      "reports": {
+        "supported": 1
+      }
     }
   ]
 }

@@ -8,7 +8,7 @@ Only behavior somebody reported or a maintainer checked is listed; a speaker tha
 untested, not broken. A status follows the most reported one, so one report does not flip a speaker.
 Entries marked 🔒 are curated by a maintainer: reports are counted but do not change them.
 
-<!-- Generated from speakers.json (list version 1). Do not edit by hand: the bot and
+<!-- Generated from speakers.json (list version 2). Do not edit by hand: the bot and
      `python3 scripts/render_readme.py` keep it current. -->
 
 ## Supported
@@ -19,6 +19,7 @@ Entries marked 🔒 are curated by a maintainer: reports are counted but do not 
 | Sonos (tested on Play:5) 🔒 | DLNA |  |  |  | [#48](https://github.com/AriaCast/AriaCast-app/issues/48), reporter: DLNA was working |
 | WiiM (tested on Pro Plus) 🔒 | DLNA | The track title changes but playback stays paused at 0:00 after every track change.<br>Pressing play in the WiiM app starts it again. | Update: AriaCast now sends Play after every track change. If it still stops, press play once in the WiiM app and report it. |  | [#50](https://github.com/AriaCast/AriaCast-app/issues/50), fixed in the 2.0 line; the reporter's confirmation is not recorded |
 | shairport-sync 🔒 | AirPlay 1 |  |  |  | Maintainer's own test in [#48](https://github.com/AriaCast/AriaCast-app/issues/48); the AirPlay version is not stated there, so it is listed under AirPlay 1 |
+| iMac (iMac20,1) | AirPlay 2 |  |  | 1 supported | [#2](https://github.com/AriaCast/known-speakers/issues/2), reported by a user |
 
 ## Supported with quirks
 
