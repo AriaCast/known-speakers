@@ -54,6 +54,14 @@ becomes the most reported one (a tie keeps the current one; `locked` entries nev
 a new entry is added with the status and symptoms the reporter wrote. The log in the issue is never
 stored, a person can send three reports a day, and `config` is never written from a report.
 
+The bot also accepts the compact report posted by the AriaCast app. It records it as `supported`
+only when the report says `Cast: CASTING` and its log contains a successful streaming event;
+otherwise it asks for a manual report so an uncertain result is not added to the list.
+
+The workflow runs when a `Speaker:` issue is opened or reopened. If an existing report did not
+trigger, add the `speaker-report` label or comment `/process` on that issue. A hidden marker in
+the bot's reply prevents the same issue from being counted twice.
+
 ## Keeping the app and this repository in step
 
 `tests/data/generated-sample.json` is what the bot writes for `tests/data/issue-new.md`. The same
