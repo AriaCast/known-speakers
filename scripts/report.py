@@ -29,19 +29,71 @@ MAX_PER_AUTHOR_PER_DAY = 3
 FORM_STATUS = {label: key for key, label in lib.STATUS_LABELS.items()}
 
 
+def parse_app_report(body):
+    """Translate the compact report posted by the AriaCast app into the form fields."""
+    speaker_line = re.search(
+        r"^Speaker:\\s*protocol=([^,\\r\\n]+),\\s*model=(.*?)(?:,\\s*name=([^\\r\\n]+))?\\s*$",
+        body or "",
+        re.M,
+    )
+    if not speaker_line:
+        return None
+
+    protocol_raw, model, name = (part.strip() if part else "" for part in speaker_line.groups())
+    protocols = {
+        "airplay2": "AirPlay 2",
+        "airplay": "AirPlay 1",
+        "dlna": "DLNA",
+        "google cast": "Google Cast",
+        "snapcast": "Snapcast",
+        "sendspin": "Sendspin",
+        "ariacast": "AriaCast",
+        "vban": "VBAN",
+        "no local protocol": "No local protocol",
+    }
+    protocol = protocols.get(protocol_raw.casefold())
+    if not protocol:
+        return {"_parse_error": "The app report uses an unknown protocol. Please submit it with the GitHub report form."}
+
+    cast = re.search(r"^Cast:\\s*([^\\s]+)", body or "", re.M)
+    streaming = re.search(r"\\bstreaming\\s*\\(", body or "", re.I)
+    if not cast or cast.group(1).upper() != "CASTING" or not streaming:
+        return {"_parse_error": "The app report does not confirm an active stream. Please use the GitHub report form to choose a status and describe what happens."}
+
+    display_name = name or model
+    if name and model and name.casefold() != model.casefold():
+        display_name = "%s (%s)" % (name, model)
+    details = "model=%s%s, protocol=%s" % (
+        model,
+        ", name=%s" % name if name else "",
+        protocol_raw,
+    )
+    return {
+        "Speaker": display_name,
+        "Protocol": protocol,
+        "How does it work?": "Supported",
+        "What happens": "",
+        "Speaker details": details,
+    }
+
+
 def parse_form(body):
-    """Cut a rendered issue form into {label: text}. GitHub writes each field as `### Label`."""
+    """Read either a GitHub issue form or the compact report posted by the AriaCast app."""
     fields, label, lines = {}, None, []
-    for line in (body or "").replace("\r\n", "\n").split("\n"):
+    for line in (body or "").replace("\\r\\n", "\\n").split("\\n"):
         if line.startswith("### "):
             if label is not None:
-                fields[label] = "\n".join(lines).strip()
+                fields[label] = "\\n".join(lines).strip()
             label, lines = line[4:].strip(), []
         elif label is not None:
             lines.append(line)
     if label is not None:
-        fields[label] = "\n".join(lines).strip()
-    return {k: ("" if v == "_No response_" else v) for k, v in fields.items()}
+        fields[label] = "\\n".join(lines).strip()
+    fields = {k: ("" if v == "_No response_" else v) for k, v in fields.items()}
+    if fields.get("Speaker") and fields.get("Protocol"):
+        return fields
+    app_fields = parse_app_report(body or "")
+    return app_fields if app_fields is not None else fields
 
 
 def symptoms_of(fields):
@@ -70,6 +122,8 @@ def shown_status(entry):
 def record(fields, number, repo, doc, reports_today=0):
     """Returns (outcome, entry, text): outcome is "added", "counted" or "refused"."""
     refuse = lambda why: ("refused", None, why)  # noqa: E731
+    if fields.get("_parse_error"):
+        return refuse(fields["_parse_error"])
     if reports_today > MAX_PER_AUTHOR_PER_DAY:
         return refuse("You have sent %d reports in the last day; the limit is %d. Please try again tomorrow." % (reports_today, MAX_PER_AUTHOR_PER_DAY))
     speaker = lib.clean(fields.get("Speaker", ""), 80)
