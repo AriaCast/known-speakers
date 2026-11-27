@@ -32,14 +32,16 @@ FORM_STATUS = {label: key for key, label in lib.STATUS_LABELS.items()}
 def parse_app_report(body):
     """Translate the compact report posted by the AriaCast app into the form fields."""
     speaker_line = re.search(
-        r"^Speaker:\\s*protocol=([^,\\r\\n]+),\\s*model=(.*?)(?:,\\s*name=([^\\r\\n]+))?\\s*$",
+        r"^Speaker:\\s*protocol=([^,\\r\\n]+),\\s*model=([^\\r\\n]+)$",
         body or "",
         re.M,
     )
     if not speaker_line:
         return None
 
-    protocol_raw, model, name = (part.strip() if part else "" for part in speaker_line.groups())
+    protocol_raw, device = (part.strip() for part in speaker_line.groups())
+    name_match = re.match(r"^(.*?),\\s*name=(.*)$", device)
+    model, name = (name_match.group(1).strip(), name_match.group(2).strip()) if name_match else (device, "")
     protocols = {
         "airplay2": "AirPlay 2",
         "airplay": "AirPlay 1",
@@ -186,6 +188,8 @@ def record(fields, number, repo, doc, reports_today=0):
 
 
 def comment_for(outcome, entry, why):
+    if outcome == "duplicate":
+        return why
     if outcome == "refused":
         return "Thanks for the report. I could not record it: %s\n\nPlease open a new report once that is fixed." % why
     label = lib.STATUS_LABELS[entry["status"]]
@@ -204,8 +208,17 @@ def main(argv, env):
     if not re.fullmatch(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+", repo):
         raise SystemExit("unexpected repository name")
     doc = lib.load(data_path)
-    outcome, entry, why = record(parse_form(env.get("ISSUE_BODY", "")), number, repo, doc, int(env.get("AUTHOR_REPORTS_TODAY") or 0))
-    if outcome != "refused":
+    evidence_marker = "[#%d](https://github.com/%s/issues/%d)" % (number, repo, number)
+    already_recorded = any(
+        evidence_marker in entry.get("evidence", "")
+        for entry in doc.get("speakers", [])
+        if isinstance(entry, dict)
+    )
+    if already_recorded:
+        outcome, entry, why = "duplicate", None, "This issue has already been processed; the list was not changed."
+    else:
+        outcome, entry, why = record(parse_form(env.get("ISSUE_BODY", "")), number, repo, doc, int(env.get("AUTHOR_REPORTS_TODAY") or 0))
+    if outcome not in ("refused", "duplicate"):
         doc["version"] = int(doc["version"]) + 1
         # SPEAKER_REPORT_TODAY only exists so the tests can pin the date.
         doc["updated"] = env.get("SPEAKER_REPORT_TODAY") or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
