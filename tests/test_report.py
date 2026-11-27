@@ -113,10 +113,12 @@ class KnownSpeaker(unittest.TestCase):
         self.assertEqual(r.entry("open-box-dlna")["status"], "unsupported")
 
     def test_a_locked_entry_counts_reports_but_never_changes(self):
-        r = Run(form(speaker="WiiM", status="Unsupported", happens=""), base="wiim-many-reports.json")
+        # The report explains itself, so without "locked" the status would flip.
+        r = Run(form(speaker="WiiM", status="Unsupported", happens="Never plays"), base="wiim-many-reports.json")
         e = r.entry("wiim-dlna-restart")
         self.assertEqual(e["status"], "supported")
         self.assertEqual(e["reports"]["unsupported"], 6)
+        self.assertNotIn("symptoms", e)
         self.assertIn("curated by a maintainer", r.said())
 
     def test_the_version_still_goes_up_when_a_report_is_counted(self):
