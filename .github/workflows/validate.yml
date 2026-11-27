@@ -1,0 +1,17 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The list follows the rules the apps apply
+        run: python3 -B scripts/validate.py speakers.json
+      - name: README.md is generated from the list
+        run: python3 -B scripts/render_readme.py --check
+      - name: Tests
+        run: python3 -B -m unittest discover -s tests -v
