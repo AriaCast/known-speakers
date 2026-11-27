@@ -32,7 +32,7 @@ FORM_STATUS = {label: key for key, label in lib.STATUS_LABELS.items()}
 def parse_app_report(body):
     """Translate the compact report posted by the AriaCast app into the form fields."""
     speaker_line = re.search(
-        r"^Speaker:\\s*protocol=([^,\\r\\n]+),\\s*model=([^\\r\\n]+)$",
+        r"^Speaker:\s*protocol=([^,\r\n]+),\s*model=([^\r\n]+)$",
         body or "",
         re.M,
     )
@@ -40,7 +40,7 @@ def parse_app_report(body):
         return None
 
     protocol_raw, device = (part.strip() for part in speaker_line.groups())
-    name_match = re.match(r"^(.*?),\\s*name=(.*)$", device)
+    name_match = re.match(r"^(.*?),\s*name=(.*)$", device)
     model, name = (name_match.group(1).strip(), name_match.group(2).strip()) if name_match else (device, "")
     protocols = {
         "airplay2": "AirPlay 2",
@@ -57,8 +57,8 @@ def parse_app_report(body):
     if not protocol:
         return {"_parse_error": "The app report uses an unknown protocol. Please submit it with the GitHub report form."}
 
-    cast = re.search(r"^Cast:\\s*([^\\s]+)", body or "", re.M)
-    streaming = re.search(r"\\bstreaming\\s*\\(", body or "", re.I)
+    cast = re.search(r"^Cast:\s*([^\s]+)", body or "", re.M)
+    streaming = re.search(r"\bstreaming\s*\(", body or "", re.I)
     if not cast or cast.group(1).upper() != "CASTING" or not streaming:
         return {"_parse_error": "The app report does not confirm an active stream. Please use the GitHub report form to choose a status and describe what happens."}
 
@@ -82,15 +82,15 @@ def parse_app_report(body):
 def parse_form(body):
     """Read either a GitHub issue form or the compact report posted by the AriaCast app."""
     fields, label, lines = {}, None, []
-    for line in (body or "").replace("\\r\\n", "\\n").split("\\n"):
+    for line in (body or "").replace("\r\n", "\n").split("\n"):
         if line.startswith("### "):
             if label is not None:
-                fields[label] = "\\n".join(lines).strip()
+                fields[label] = "\n".join(lines).strip()
             label, lines = line[4:].strip(), []
         elif label is not None:
             lines.append(line)
     if label is not None:
-        fields[label] = "\\n".join(lines).strip()
+        fields[label] = "\n".join(lines).strip()
     fields = {k: ("" if v == "_No response_" else v) for k, v in fields.items()}
     if fields.get("Speaker") and fields.get("Protocol"):
         return fields
