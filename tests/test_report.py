@@ -18,6 +18,26 @@ class ParseForm(unittest.TestCase):
         self.assertEqual(report.parse_form(None), {})
 
 
+    def test_parses_the_compact_report_posted_by_the_ariacast_app(self):
+        body = """AriaCast speaker report
+Addresses are shortened to their first two parts; speaker names are included.
+
+App: AriaCast Test 2.0.0-test
+Phone: samsung SM-S938B, Android 17 (API 37)
+Speaker: protocol=AirPlay2, model=iMac20,1, name=iMac
+Known: nothing recorded for this speaker yet
+Cast: CASTING
+
+14:41:25.910 IN HANDSHAKE [AirPlay2Client] streaming (AirPlay 2, NTP, pairing=transient)
+"""
+        fields = report.parse_form(body)
+        self.assertEqual(fields["Speaker"], "iMac (iMac20,1)")
+        self.assertEqual(fields["Protocol"], "AirPlay 2")
+        self.assertEqual(fields["How does it work?"], "Supported")
+        self.assertEqual(fields["Speaker details"], "model=iMac20,1, name=iMac, protocol=AirPlay2")
+        self.assertEqual(report.record(fields, 2, "AriaCast/known-speakers", lib.load(os.path.join(DATA, "base.json")))[0], "added")
+
+
 class NewSpeaker(unittest.TestCase):
     def test_it_is_added_and_matches_the_golden_file(self):
         r = Run(read("issue-new.md"))
