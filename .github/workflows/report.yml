@@ -33,8 +33,21 @@ jobs:
         with:
           ref: main
 
+      - name: Prevent processing the same issue twice
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          count=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments?per_page=100" \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- ariacast-report-processed -->")))] | length')
+
+          echo "already=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Count this author's reports in the last 24 hours
         id: rate
+        if: steps.idempotency.outputs.already != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTHOR: ${{ github.event.issue.user.login }}
@@ -53,6 +66,7 @@ jobs:
 
       - name: Validate and record the report
         id: record
+        if: steps.idempotency.outputs.already != 'true'
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -62,7 +76,7 @@ jobs:
           python3 -B scripts/report.py speakers.json "$RUNNER_TEMP/comment.md"
 
       - name: Commit and push the updated list
-        if: steps.record.outputs.result != 'refused' && steps.record.outputs.result != 'duplicate'
+        if: steps.idempotency.outputs.already != 'true' && steps.record.outputs.result != 'refused' && steps.record.outputs.result != 'duplicate'
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
@@ -83,11 +97,13 @@ jobs:
           git push origin HEAD:main
 
       - name: Reply to the report
+        if: steps.idempotency.outputs.already != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           RESULT: ${{ steps.record.outputs.result }}
         run: |
+          printf '\\n\\n<!-- ariacast-report-processed -->\\n' >> "$RUNNER_TEMP/comment.md"
           gh issue comment "$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
 
           if [ "$RESULT" = "refused" ]; then
