@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "version": 2,
-  "updated": "2026-11-27",
+  "version": 3,
+  "updated": "2026-11-28",
   "speakers": [
     {
       "id": "sonos-airplay2",
@@ -156,6 +156,25 @@
       "evidence": "[#2](https://github.com/AriaCast/known-speakers/issues/2), reported by a user",
       "reports": {
         "supported": 1
+      }
+    },
+    {
+      "id": "shairportsync-sendspin",
+      "speaker": "ShairportSync",
+      "protocol": "Sendspin",
+      "status": "quirks",
+      "match": {
+        "platform": "Sendspin",
+        "mentions": [
+          "shairportsync"
+        ]
+      },
+      "symptoms": [
+        "I was listening to music, I paused and when I wanted to replay, nothing hapened."
+      ],
+      "evidence": "[#3](https://github.com/AriaCast/known-speakers/issues/3), reported by a user",
+      "reports": {
+        "quirks": 1
       }
     }
   ]

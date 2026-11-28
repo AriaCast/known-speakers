@@ -8,7 +8,7 @@ Only behavior somebody reported or a maintainer checked is listed; a speaker tha
 untested, not broken. A status follows the most reported one, so one report does not flip a speaker.
 Entries marked 🔒 are curated by a maintainer: reports are counted but do not change them.
 
-<!-- Generated from speakers.json (list version 2). Do not edit by hand: the bot and
+<!-- Generated from speakers.json (list version 3). Do not edit by hand: the bot and
      `python3 scripts/render_readme.py` keep it current. -->
 
 ## Supported
@@ -27,6 +27,7 @@ Entries marked 🔒 are curated by a maintainer: reports are counted but do not 
 |---|---|---|---|---|---|
 | shairport-sync 🔒 | AirPlay 2 | The speaker accepts the connection but timing is off, or AriaCast drops to AirPlay 1. | Nothing to do: AriaCast tries NTP timing and falls back to AirPlay 1 on its own. Real PTP needs root. |  | Code: PtpMaster (shairport-sync with nqptp accepts only PTP timing) |
 | Apple TV 🔒 | AirPlay (video) | On Apple TVs that require pairing, casting a video fails with "This AirPlay device requires pairing for video". Audio casting is not affected. | Cast audio only. Video works with Apple TVs that allow unpaired access. |  | Roadmap status table and VideoTargets.kt |
+| ShairportSync | Sendspin | I was listening to music, I paused and when I wanted to replay, nothing hapened. |  | 1 supported with quirks | [#3](https://github.com/AriaCast/known-speakers/issues/3), reported by a user |
 
 ## Unsupported
 
